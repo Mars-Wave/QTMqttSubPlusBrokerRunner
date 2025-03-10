@@ -14,8 +14,8 @@ MqttBrokerManager::MqttBrokerManager(QObject* parent)
 {
     m_mqttClient->setHostname("localhost");
     m_mqttClient->setPort(1883);
-    m_mqttClient->setUsername("root");
-    m_mqttClient->setPassword("Skandal2025");
+    m_mqttClient->setUsername("user");
+    m_mqttClient->setPassword("pass");
 
     connect(m_brokerProcess,
             &QProcess::stateChanged,
@@ -44,50 +44,13 @@ MqttBrokerManager::MqttBrokerManager(QObject* parent)
     connect(&m_connectionTimer, &QTimer::timeout, this, &MqttBrokerManager::connectToMqtt);
 }
 
-MqttBrokerManager::~MqttBrokerManager()
-{
-    stopBroker();
-}
-
-bool MqttBrokerManager::isRunning() const
-{
-    return m_isRunning;
-}
-
-QVariantList MqttBrokerManager::messageHistory() const  // Changed return type to match header
-{
-    return m_messageHistory;
-}
-
 void MqttBrokerManager::clearHistory()
 {
     m_messageHistory.clear();
     emit messageHistoryChanged();
 }
 
-QString MqttBrokerManager::formatTimestamp(const QDateTime &timestamp) const
-{
-    return timestamp.toString("yyyy-MM-dd HH:mm:ss.zzz");
-}
 
-void MqttBrokerManager::toggleBroker()
-{
-    if (m_isRunning) {
-        stopBroker();
-    } else {
-        startBroker();
-    }
-}
-
-bool MqttBrokerManager::isViewLocked() const
-{
-    return m_viewLocked;
-}
-
-int MqttBrokerManager::bufferedMessageCount() const
-{
-    return m_bufferedMessages.size();
-}
 
 void MqttBrokerManager::setViewLocked(bool locked)
 {
@@ -101,10 +64,7 @@ void MqttBrokerManager::setViewLocked(bool locked)
     }
 }
 
-void MqttBrokerManager::toggleViewLock()
-{
-    setViewLocked(!m_viewLocked);
-}
+
 
 void MqttBrokerManager::applyBufferedMessages()
 {
@@ -146,16 +106,6 @@ void MqttBrokerManager::addToMessageHistory(const QString& topic, const QString&
     }
 }
 
-void MqttBrokerManager::addSystemTraceMessage(const QString& message)
-{
-    addToMessageHistory("system_trace", message);
-}
-
-QString MqttBrokerManager::brokerExecutablePath() const
-{
-    return m_brokerExecutablePath;
-}
-
 void MqttBrokerManager::setBrokerExecutablePath(const QString &path)
 {
     if (m_brokerExecutablePath != path) {
@@ -163,11 +113,6 @@ void MqttBrokerManager::setBrokerExecutablePath(const QString &path)
         emit brokerExecutablePathChanged();
         addSystemTraceMessage(QString("Broker executable changed to: %1").arg(path));
     }
-}
-
-QString MqttBrokerManager::subscriptionTopic() const
-{
-    return m_subscriptionTopic;
 }
 
 void MqttBrokerManager::setSubscriptionTopic(const QString &topic)
@@ -206,7 +151,6 @@ void MqttBrokerManager::updateSubscription()
 
 void MqttBrokerManager::startBroker()
 {
-    qDebug() << "Starting broker process with executable:" << m_brokerExecutablePath;
     addSystemTraceMessage(QString("Starting MQTT broker using: %1").arg(m_brokerExecutablePath));
 
     m_brokerProcess->start(m_brokerExecutablePath);
@@ -217,14 +161,12 @@ void MqttBrokerManager::startBroker()
 
 void MqttBrokerManager::connectToMqtt()
 {
-    qDebug() << "Connecting to MQTT broker...";
     addSystemTraceMessage("Connecting to MQTT broker");
     m_mqttClient->connectToHost();
 }
 
 void MqttBrokerManager::stopBroker()
 {
-    qDebug() << "Stopping broker...";
     addSystemTraceMessage("Stopping MQTT broker");
 
     // First disconnect MQTT client
@@ -244,7 +186,7 @@ void MqttBrokerManager::stopBroker()
 
 void MqttBrokerManager::disconnectFromMqtt()
 {
-    qDebug() << "Disconnecting from MQTT...";
+    addSystemTraceMessage("Disconnecting from MQTT...");
 
     if (m_subscription) {
         m_subscription->unsubscribe();
@@ -258,8 +200,6 @@ void MqttBrokerManager::disconnectFromMqtt()
 
 void MqttBrokerManager::onBrokerProcessStateChanged(QProcess::ProcessState newState)
 {
-    qDebug() << "Broker process state changed:" << newState;
-
     QString stateStr;
     switch (newState) {
     case QProcess::NotRunning:
@@ -285,7 +225,6 @@ void MqttBrokerManager::onBrokerStandardOutput()
         QStringList lines = outputStr.split("\n");
         for (const QString& line : lines) {
             if (!line.trimmed().isEmpty()) {
-                qDebug() << "Broker stdout:" << line;
                 addSystemTraceMessage(QString("Broker: %1").arg(line));
             }
         }
@@ -301,7 +240,6 @@ void MqttBrokerManager::onBrokerStandardError()
         QStringList lines = errorStr.split("\n");
         for (const QString& line : lines) {
             if (!line.trimmed().isEmpty()) {
-                qDebug() << "Broker stderr:" << line;
                 addSystemTraceMessage(QString("Broker ERROR: %1").arg(line));
             }
         }
@@ -310,14 +248,12 @@ void MqttBrokerManager::onBrokerStandardError()
 
 void MqttBrokerManager::onMqttConnected()
 {
-    qDebug() << "MQTT client connected";
     addSystemTraceMessage("MQTT client connected to broker");
 
     // Subscribe to the configured topic
     m_subscription = m_mqttClient->subscribe(QMqttTopicFilter(m_subscriptionTopic), 0);
 
     if (!m_subscription) {
-        qDebug() << "Failed to subscribe to topics";
         addSystemTraceMessage(QString("Failed to subscribe to MQTT topic: %1").arg(m_subscriptionTopic));
         return;
     }
@@ -330,7 +266,6 @@ void MqttBrokerManager::onMqttConnected()
 
 void MqttBrokerManager::onMqttDisconnected()
 {
-    qDebug() << "MQTT client disconnected";
     addSystemTraceMessage("MQTT client disconnected from broker");
     m_subscription = nullptr;
 }
@@ -344,45 +279,4 @@ void MqttBrokerManager::onMqttMessageReceived(const QByteArray& message, const Q
 
     addToMessageHistory(topicStr, messageStr);
     emit messageReceived(topicStr, messageStr);
-}
-
-void MqttBrokerManager::onMqttError(QMqttClient::ClientError error)
-{
-    qDebug() << "MQTT client error:" << error;
-
-    QString errorStr;
-    switch (error) {
-    case QMqttClient::NoError:
-        errorStr = "No Error";
-        break;
-    case QMqttClient::InvalidProtocolVersion:
-        errorStr = "Invalid Protocol Version";
-        break;
-    case QMqttClient::IdRejected:
-        errorStr = "ID Rejected";
-        break;
-    case QMqttClient::ServerUnavailable:
-        errorStr = "Server Unavailable";
-        break;
-    case QMqttClient::BadUsernameOrPassword:
-        errorStr = "Bad Username or Password";
-        break;
-    case QMqttClient::NotAuthorized:
-        errorStr = "Not Authorized";
-        break;
-    case QMqttClient::TransportInvalid:
-        errorStr = "Transport Invalid";
-        break;
-    case QMqttClient::ProtocolViolation:
-        errorStr = "Protocol Violation";
-        break;
-    case QMqttClient::UnknownError:
-        errorStr = "Unknown Error";
-        break;
-    default:
-        errorStr = QString("Error code: %1").arg(error);
-        break;
-    }
-
-    addSystemTraceMessage(QString("MQTT Error: %1").arg(errorStr));
 }
