@@ -1,4 +1,5 @@
 # Broker + sub troubleshooter for any MQTT flow
+This projeect uses a bundled executable based on NanoMQ broker compiled from source, but you can have there any kind of executable. The aim of this project is to inspect payloads in a comfortable UI made with QML in order to debug IOT devices that communicate via MQTT.
 
 ### Additionally, you can use the following broker
 Sister project: https://github.com/Mars-Wave/nanoMQ_cpp_localhost_broker
